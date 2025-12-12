@@ -4,9 +4,6 @@
 #include <vector>
 #include "raymath.h"
 
-// Extra practice 2:
-// Have a look at the fastObjMesh data-type.
-// See if you can transform the data loaded into fastObjMesh to the data the GPU expects!
 struct Mesh
 {
 	std::vector<Vector3> positions;

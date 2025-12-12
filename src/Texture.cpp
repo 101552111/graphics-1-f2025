@@ -1,4 +1,5 @@
 #include "Texture.h"
+#include <cstdio>
 #include <cassert>
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -15,6 +16,18 @@ void LoadImage(Image* image, int width, int height)
 	image->width = width;
 	image->height = height;
 	image->channels = 4;
+}
+
+void LoadImage(Image* image, const char* filename)
+{
+	stbi_uc* pixels = stbi_load(filename, &image->width, &image->height, &image->channels, 4);
+	if (image->channels != 4)
+		printf("INFO: Converted image %s from %i channels to 4 channels\n", filename, image->channels);
+	image->channels = 4;
+
+	image->pixels.resize(image->width * image->height);
+	memcpy(image->pixels.data(), pixels, image->pixels.size() * sizeof(Pixel));
+	stbi_image_free(pixels);
 }
 
 void UnloadImage(Image* image)
@@ -102,29 +115,3 @@ void EndTexture()
 	glBindTexture(GL_TEXTURE_2D, GL_NONE);
 	f_texture = GL_NONE;
 }
-
-void LoadImageFromFile(Image* image, const char* path)
-{
-	int width, height, channels;
-	unsigned char* data = stbi_load(path, &width, &height, &channels, 4); 
-
-	if (data)
-	{
-		image->width = width;
-		image->height = height;
-		image->channels = 4;
-		image->pixels.resize(width * height);
-
-		memcpy(image->pixels.data(), data, width * height * sizeof(Pixel));
-	}
-	else
-	{
-		printf("Could not load image: %s\n", path);
-	}
-
-	stbi_image_free(data);
-}
-
-// Extra practice:
-// Read all of https://learnopengl.com/Getting-started/Textures
-// Modify this program to interpolate between the warm and cool gradients based on a periodic function
