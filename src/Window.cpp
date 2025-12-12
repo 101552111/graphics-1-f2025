@@ -16,9 +16,6 @@ struct App
 	GLFWwindow* window = nullptr;
     int keys_prev[KEY_COUNT]{};
     int keys_curr[KEY_COUNT]{};
-    float frame_time_begin = 0.0f;
-    float frame_time_end = 0.0f;
-    float frame_time_delta = 0.0f;
 } g_app;
 
 void KeyboardCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
@@ -142,11 +139,6 @@ bool WindowShouldClose()
     return glfwWindowShouldClose(g_app.window);
 }
 
-float FrameTime()
-{
-    return g_app.frame_time_delta;
-}
-
 float Time()
 {
     return glfwGetTime();
@@ -163,17 +155,6 @@ void Loop()
 
     /* Poll for and process events */
     glfwPollEvents();
-}
-
-void BeginFrame()
-{
-    g_app.frame_time_begin = glfwGetTime();
-}
-
-void EndFrame()
-{
-    g_app.frame_time_end = glfwGetTime();
-    g_app.frame_time_delta = g_app.frame_time_end - g_app.frame_time_begin;
 }
 
 void BeginGui()

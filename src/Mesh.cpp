@@ -16,33 +16,10 @@ void LoadMeshPlaneUnoptimal(Mesh* mesh);
 
 void LoadMeshObj(Mesh* mesh, const char* path)
 {
-    // Follow the same pattern for tcoords if you didn't complete the obj-loader for assignment 3!
 	fastObjMesh* obj = fast_obj_read(path);
 
-    size_t vc = obj->index_count;
-    mesh->vertex_count = vc;
-    mesh->positions.resize(vc);
-    mesh->normals.resize(vc);
-    mesh->tcoords.resize(vc);
-
-    Vector3* positions = (Vector3*)obj->positions;
-    Vector3* normals = (Vector3*)obj->normals;
-    Vector2* tcoords = (Vector2*)obj->texcoords;
-    for (size_t i = 0; i < vc; i++)
-    {
-        fastObjUInt idx_v = obj->indices[i].p;
-        fastObjUInt idx_vn = obj->indices[i].n;
-        fastObjUInt idx_vt = obj->indices[i].t;
-        Vector3 v = positions[idx_v];
-        Vector3 vn = normals[idx_vn];
-        Vector2 vt = tcoords[idx_vt];
-        mesh->positions[i] = v;
-        mesh->normals[i] = vn;
-        mesh->tcoords[i] = vt;
-    }
-
+	// LoadMesh transforms an internal fastObjMesh into our renderer's unified Mesh type
 	fast_obj_destroy(obj);
-    LoadMeshGPU(mesh);
 }
 
 void UnloadMesh(Mesh* mesh)
@@ -63,13 +40,13 @@ void UnloadMesh(Mesh* mesh)
 
 void LoadMeshPlane(Mesh* mesh)
 {
-    par_shapes_mesh* par = par_shapes_create_plane(1, 1);
-    par_shapes_translate(par, -0.5f, -0.5f, 0.0f);
-    
-    LoadMeshPar(mesh, par);
-    par_shapes_free_mesh(par);
+    //par_shapes_mesh* par = par_shapes_create_plane(1, 1);
+    //par_shapes_translate(par, -0.5f, -0.5f, 0.0f);
+    //
+    //LoadMeshPar(mesh, par);
+    //par_shapes_free_mesh(par);
 
-    LoadMeshPlaneOptimal(mesh);
+    LoadMeshPlaneUnoptimal(mesh);
     LoadMeshGPU(mesh);
 }
 
@@ -150,7 +127,6 @@ void DrawMesh(const Mesh& mesh)
 
 void LoadMeshGPU(Mesh* mesh)
 {
-    // Consider changing empty-checks to assertions because its undefined behaviour (VERY BAD GPU NO LIKE) to sample data that doesn't exist!!!
     assert(!mesh->positions.empty());
     mesh->pbo = CreateBuffer();
     BindVertexBuffer(mesh->pbo);
@@ -292,9 +268,9 @@ void LoadMeshPlaneUnoptimal(Mesh* mesh)
     indices.resize(6);
     
     positions[0] = { -0.5f, -0.5f, 0.0f };
-    positions[1] = {  0.5f, -0.5f, 0.0f };
-    positions[2] = {  0.5f,  0.5f, 0.0f };
-    positions[3] = { -0.5f,  0.5f, 0.0f };
+    positions[1] = { 0.5f, -0.5f, 0.0f };
+    positions[2] = { 0.5f,  0.5f, 0.0f };
+    positions[3] = { -0.5f, 0.5f, 0.0f };
 
     tcoords[0] = { 0.0f, 0.0f };
     tcoords[1] = { 1.0f, 0.0f };

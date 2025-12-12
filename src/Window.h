@@ -9,12 +9,8 @@ int WindowHeight();
 void SetWindowShouldClose(bool close);
 bool WindowShouldClose();
 
-float FrameTime();
 float Time();
 void Loop();
-
-void BeginFrame();
-void EndFrame();
 
 void BeginGui();
 void EndGui();

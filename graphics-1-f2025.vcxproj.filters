@@ -16,8 +16,8 @@
     <Filter Include="Header Files\imgui">
       <UniqueIdentifier>{fc84a823-1c7b-4758-82ed-e273983343eb}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Header Files\stb_image">
-      <UniqueIdentifier>{b456e640-d0e8-4139-8d57-e0874e756af2}</UniqueIdentifier>
+    <Filter Include="Shaders">
+      <UniqueIdentifier>{d0dd0235-a5ad-4702-8aae-374a9585cea3}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -60,15 +60,15 @@
     <ClCompile Include="inc\imgui\imgui_impl_glfw.cpp">
       <Filter>Header Files\imgui</Filter>
     </ClCompile>
-    <ClCompile Include="src\Texture.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Window.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\Shader.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\raymath.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="inc\imgui\imconfig.h">
@@ -104,17 +104,13 @@
     <ClInclude Include="src\Mesh.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\Texture.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="inc\stb_image\stb_image.h">
-      <Filter>Header Files\stb_image</Filter>
-    </ClInclude>
-    <ClInclude Include="inc\stb_image\stb_image_write.h">
-      <Filter>Header Files\stb_image</Filter>
-    </ClInclude>
-    <ClInclude Include="src\raymath.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="assets\shaders\position_color.vert">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="assets\shaders\tcoord_color.vert">
+      <Filter>Shaders</Filter>
+    </None>
   </ItemGroup>
 </Project>
