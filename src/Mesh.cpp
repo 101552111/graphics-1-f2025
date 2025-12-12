@@ -1,284 +1,319 @@
-#define PAR_SHAPES_IMPLEMENTATION
-#define FAST_OBJ_IMPLEMENTATION
-#include <par_shapes.h>
-#include <fast_obj.h>
 #include "Mesh.h"
-#include <cassert>
+#include "Buffer.h"
 #include <cstdio>
+#include <cassert>
 
-void Upload(Mesh* mesh);
+#define PAR_SHAPES_IMPLEMENTATION
+#include <par_shapes/par_shapes.h>
 
-void GenCube(Mesh* mesh, float width, float height, float length);
+#define FAST_OBJ_IMPLEMENTATION
+#include <fast_obj/fast_obj.h>
 
-void CreateMesh(Mesh* mesh, const char* path)
+void LoadMeshGPU(Mesh* mesh);
+void LoadMeshPar(Mesh* mesh, par_shapes_mesh* par);
+void LoadMeshPlaneOptimal(Mesh* mesh);
+void LoadMeshPlaneUnoptimal(Mesh* mesh);
+
+void LoadMeshObj(Mesh* mesh, const char* path)
 {
+    // Follow the same pattern for tcoords and normals if you didn't complete the obj-loader for assignment 3!
 	fastObjMesh* obj = fast_obj_read(path);
-	int count = obj->index_count;
-	mesh->positions.resize(count);
-	mesh->normals.resize(count);
-	std::vector<fastObjIndex> indices(obj->index_count);
-	memcpy(indices.data(), obj->indices, indices.size() * sizeof(fastObjIndex));
-	
-	assert(obj->position_count > 1);
-	for (int i = 0; i < count; i++)
-	{
-		// Using the obj file's indices, populate the mesh->positions with the object's vertex positions
-		fastObjIndex idx = obj->indices[i];
-		Vector3 position = ((Vector3*)obj->positions)[idx.p];
-		mesh->positions[i] = position;
-	}
-	
-	assert(obj->normal_count > 1);
-	for (int i = 0; i < count; i++)
-	{
-		// Using the obj file's indices, populate the mesh->normals with the object's vertex normals
-		fastObjIndex idx = obj->indices[i];
-		Vector3 normal = ((Vector3*)obj->normals)[idx.n];
-		mesh->normals[i] = normal;
-	}
-	
-	if (obj->texcoord_count > 1)
-	{
-		mesh->tcoords.resize(count);
-		for (int i = 0; i < count; i++)
-		{
-			// Using the obj file's indices, populate the mesh->tcoords with the object's vertex texture coordinates
-			fastObjIndex idx = obj->indices[i];
-			Vector2 tcoord = ((Vector2*)obj->texcoords)[idx.t];
-			mesh->tcoords[i] = tcoord;
-		}
-	}
-	else
-	{
-		printf("**Warning: mesh %s loaded without texture coordinates**\n", path);
-	}
+
+    size_t vc = obj->index_count;
+    mesh->vertex_count = vc;
+    mesh->positions.resize(vc);
+
+    Vector3* positions = (Vector3*)obj->positions;
+    for (size_t i = 0; i < vc; i++)
+    {
+        fastObjUInt idx_v = obj->indices[i].p;
+        Vector3 v = positions[idx_v];
+        mesh->positions[i] = v;
+    }
+
 	fast_obj_destroy(obj);
-	mesh->count = count;
-
-	Upload(mesh);
+    LoadMeshGPU(mesh);
 }
 
-void CreateMesh(Mesh* mesh, ShapeType shape)
+void UnloadMesh(Mesh* mesh)
 {
-	// 1. Generate par_shapes_mesh
-	par_shapes_mesh* par = nullptr;
-	switch (shape)
-	{
-	case PLANE:
-		par = par_shapes_create_plane(1, 1);
-		break;
+    DestroyVertexArray(&mesh->vao);
+    DestroyBuffer(&mesh->pbo);
+    DestroyBuffer(&mesh->tbo);
+    DestroyBuffer(&mesh->nbo);
+    DestroyBuffer(&mesh->ibo);
 
-		// No longer supported because par platonic solids work differently than par parametrics
-	case CUBE:
-		//par = par_shapes_create_cube();
-		break;
+    mesh->positions.resize(0);
+    mesh->tcoords.resize(0);
+    mesh->normals.resize(0);
+    mesh->indices.resize(0);
 
-	case SPHERE:
-		par = par_shapes_create_parametric_sphere(8, 8);
-		break;
-
-	default:
-		assert(false, "Invalid shape type");
-		break;
-	}
-	
-	if (par != nullptr)
-	{
-		par_shapes_compute_normals(par);
-
-		// 2. Convert par_shapes_mesh to our Mesh representation
-		int count = par->ntriangles * 3;	// 3 points per triangle
-		mesh->count = count;
-		mesh->indices.resize(count);
-		memcpy(mesh->indices.data(), par->triangles, count * sizeof(uint16_t));
-		mesh->positions.resize(par->npoints);
-		memcpy(mesh->positions.data(), par->points, par->npoints * sizeof(Vector3));
-		mesh->normals.resize(par->npoints);
-		memcpy(mesh->normals.data(), par->normals, par->npoints * sizeof(Vector3));
-		mesh->tcoords.resize(par->npoints);
-		memcpy(mesh->tcoords.data(), par->tcoords, par->npoints * sizeof(Vector2));
-		par_shapes_free_mesh(par);
-	}
-	else
-	{
-		assert(shape == CUBE);
-		GenCube(mesh, 1.0f, 1.0f, 1.0f);
-	}
-
-	// 3. Upload Mesh to GPU
-	Upload(mesh);
+    mesh->vertex_count = -1;
 }
 
-void DestroyMesh(Mesh* mesh)
+void LoadMeshPlane(Mesh* mesh)
 {
-	glDeleteBuffers(1, &mesh->ebo);
-	glDeleteBuffers(1, &mesh->tbo);
-	glDeleteBuffers(1, &mesh->nbo);
-	glDeleteBuffers(1, &mesh->pbo);
-	glDeleteVertexArrays(1, &mesh->vao);
+    //par_shapes_mesh* par = par_shapes_create_plane(1, 1);
+    //par_shapes_translate(par, -0.5f, -0.5f, 0.0f);
+    //
+    //LoadMeshPar(mesh, par);
+    //par_shapes_free_mesh(par);
 
-	mesh->vao = mesh->pbo = mesh->nbo = mesh->tbo = mesh->ebo = GL_NONE;
+    LoadMeshPlaneOptimal(mesh);
+    LoadMeshGPU(mesh);
+}
+
+void LoadMeshSphere(Mesh* mesh)
+{
+    par_shapes_mesh* par = par_shapes_create_parametric_sphere(8, 8);
+    LoadMeshPar(mesh, par);
+    par_shapes_free_mesh(par);
+
+    LoadMeshGPU(mesh);
+}
+
+void LoadMeshHemisphere(Mesh* mesh)
+{
+    par_shapes_mesh* par = par_shapes_create_hemisphere(4, 4);
+    LoadMeshPar(mesh, par);
+    par_shapes_free_mesh(par);
+
+    LoadMeshGPU(mesh);
+}
+
+void LoadMeshTetrahedron(Mesh* mesh)
+{
+    par_shapes_mesh* par = par_shapes_create_tetrahedron();
+    LoadMeshPar(mesh, par);
+    par_shapes_free_mesh(par);
+
+    LoadMeshGPU(mesh);
+}
+
+void LoadMeshCube(Mesh* mesh)
+{
+    par_shapes_mesh* par = par_shapes_create_cube();
+    par_shapes_translate(par, -0.5f, -0.5f, -0.5f);
+
+    LoadMeshPar(mesh, par);
+    par_shapes_free_mesh(par);
+
+    LoadMeshGPU(mesh);
+}
+
+void LoadMeshOctahedron(Mesh* mesh)
+{
+    par_shapes_mesh* par = par_shapes_create_octahedron();
+    LoadMeshPar(mesh, par);
+    par_shapes_free_mesh(par);
+
+    LoadMeshGPU(mesh);
+}
+
+void LoadMeshDodecahedron(Mesh* mesh)
+{
+    par_shapes_mesh* par = par_shapes_create_dodecahedron();
+    LoadMeshPar(mesh, par);
+    par_shapes_free_mesh(par);
+
+    LoadMeshGPU(mesh);
+}
+
+void LoadMeshIcosahedron(Mesh* mesh)
+{
+    par_shapes_mesh* par = par_shapes_create_icosahedron();
+    LoadMeshPar(mesh, par);
+    par_shapes_free_mesh(par);
+
+    LoadMeshGPU(mesh);
 }
 
 void DrawMesh(const Mesh& mesh)
 {
-	glBindVertexArray(mesh.vao);
-	if (mesh.ebo != GL_NONE)
-		glDrawElements(GL_TRIANGLES, mesh.count, GL_UNSIGNED_SHORT, nullptr);
-	else
-		glDrawArrays(GL_TRIANGLES, 0, mesh.count);
-	glBindVertexArray(GL_NONE);
+    BindVertexArray(mesh.vao);
+    if (mesh.ibo != GL_NONE)
+        glDrawElements(GL_TRIANGLES, mesh.vertex_count, GL_UNSIGNED_SHORT, nullptr);
+    else
+        glDrawArrays(GL_TRIANGLES, 0, mesh.vertex_count);
+    UnbindVertexArray(mesh.vao);
 }
 
-void Upload(Mesh* mesh)
+void LoadMeshGPU(Mesh* mesh)
 {
-	GLuint vao, pbo, nbo, tbo, ebo;
-	vao = pbo = nbo = tbo = ebo = GL_NONE;
-	glGenVertexArrays(1, &vao);
-	glBindVertexArray(vao);
-	
-	glGenBuffers(1, &pbo);
-	glBindBuffer(GL_ARRAY_BUFFER, pbo);
-	glBufferData(GL_ARRAY_BUFFER, mesh->positions.size() * sizeof(Vector3), mesh->positions.data(), GL_STATIC_DRAW);
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vector3), nullptr);
-	glEnableVertexAttribArray(0);
+    assert(!mesh->positions.empty());
+    mesh->pbo = CreateBuffer();
+    BindVertexBuffer(mesh->pbo);
+    UpdateVertexBuffer(mesh->positions.data(), mesh->positions.size() * sizeof(Vector3));
+    UnbindVertexBuffer(mesh->pbo);
 
-	glGenBuffers(1, &nbo);
-	glBindBuffer(GL_ARRAY_BUFFER, nbo);
-	glBufferData(GL_ARRAY_BUFFER, mesh->normals.size() * sizeof(Vector3), mesh->normals.data(), GL_STATIC_DRAW);
-	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vector3), nullptr);
-	glEnableVertexAttribArray(1);
+    if (!mesh->tcoords.empty())
+    {
+        mesh->tbo = CreateBuffer();
+        BindVertexBuffer(mesh->tbo);
+        UpdateVertexBuffer(mesh->tcoords.data(), mesh->tcoords.size() * sizeof(Vector2));
+        UnbindVertexBuffer(mesh->tbo);
+    }
+    else
+        printf("Warning: mesh loaded without texture coordinates\n");
 
-	if (!mesh->tcoords.empty())
-	{
-		glGenBuffers(1, &tbo);
-		glBindBuffer(GL_ARRAY_BUFFER, tbo);
-		glBufferData(GL_ARRAY_BUFFER, mesh->tcoords.size() * sizeof(Vector2), mesh->tcoords.data(), GL_STATIC_DRAW);
-		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vector2), nullptr);
-		glEnableVertexAttribArray(2);
-	}
-	
-	if (!mesh->indices.empty())
-	{
-		glGenBuffers(1, &ebo);
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-		glBufferData(GL_ELEMENT_ARRAY_BUFFER, mesh->indices.size() * sizeof(uint16_t), mesh->indices.data(), GL_STATIC_DRAW);
-	}
+    if (!mesh->normals.empty())
+    {
+        mesh->nbo = CreateBuffer();
+        BindVertexBuffer(mesh->nbo);
+        UpdateVertexBuffer(mesh->normals.data(), mesh->normals.size() * sizeof(Vector3));
+        UnbindVertexBuffer(mesh->nbo);
+    }
+    else
+        printf("Warning: mesh loaded without normals\n");
 
-	glBindVertexArray(GL_NONE);
-	glBindBuffer(GL_ARRAY_BUFFER, GL_NONE);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, GL_NONE);
+    if (!mesh->indices.empty())
+    {
+        mesh->ibo = CreateBuffer();
+        BindIndexBuffer(mesh->ibo);
+            UpdateElementBuffer(mesh->indices.data(), mesh->indices.size() * sizeof(uint16_t));
+        UnbindIndexBuffer(mesh->ibo);
+    }
+    else
+        printf("Warning: mesh loaded without index buffer\n");
 
-	mesh->vao = vao;
-	mesh->pbo = pbo;
-	mesh->nbo = nbo;
-	mesh->tbo = tbo;
-	mesh->ebo = ebo;
+    mesh->vao = CreateVertexArray();
+    BindVertexArray(mesh->vao);
+
+    if (mesh->ibo != GL_NONE)
+        BindIndexBuffer(mesh->ibo);
+
+    EnableVertexAttribute(0);
+    EnableVertexAttribute(1);
+    EnableVertexAttribute(2);
+
+    assert(mesh->pbo != GL_NONE);
+    BindVertexBuffer(mesh->pbo);
+    SetVertexAttribute(0, 3, GL_FLOAT, sizeof(Vector3));
+    UnbindVertexBuffer(mesh->pbo);
+
+    if (mesh->tbo != GL_NONE)
+    {
+        BindVertexBuffer(mesh->tbo);
+        SetVertexAttribute(1, 2, GL_FLOAT, sizeof(Vector2));
+        UnbindVertexBuffer(mesh->tbo);
+    }
+    
+    if (mesh->nbo != GL_NONE)
+    {
+        BindVertexBuffer(mesh->nbo);
+        SetVertexAttribute(2, 3, GL_FLOAT, sizeof(Vector3));
+        UnbindVertexBuffer(mesh->nbo);
+    }
+
+    UnbindVertexArray(mesh->vao);
+
+    if (mesh->ibo != GL_NONE)
+        UnbindIndexBuffer(mesh->ibo);
 }
 
-void GenCube(Mesh* mesh, float width, float height, float length)
+void LoadMeshPar(Mesh* mesh, par_shapes_mesh* par)
 {
-	float positions[] = {
-		-width / 2, -height / 2, length / 2,
-		width / 2, -height / 2, length / 2,
-		width / 2, height / 2, length / 2,
-		-width / 2, height / 2, length / 2,
-		-width / 2, -height / 2, -length / 2,
-		-width / 2, height / 2, -length / 2,
-		width / 2, height / 2, -length / 2,
-		width / 2, -height / 2, -length / 2,
-		-width / 2, height / 2, -length / 2,
-		-width / 2, height / 2, length / 2,
-		width / 2, height / 2, length / 2,
-		width / 2, height / 2, -length / 2,
-		-width / 2, -height / 2, -length / 2,
-		width / 2, -height / 2, -length / 2,
-		width / 2, -height / 2, length / 2,
-		-width / 2, -height / 2, length / 2,
-		width / 2, -height / 2, -length / 2,
-		width / 2, height / 2, -length / 2,
-		width / 2, height / 2, length / 2,
-		width / 2, -height / 2, length / 2,
-		-width / 2, -height / 2, -length / 2,
-		-width / 2, -height / 2, length / 2,
-		-width / 2, height / 2, length / 2,
-		-width / 2, height / 2, -length / 2
-	};
+    // Platonic solids only contain positions initially
+    // ntriangles * 3 = vertex_count (amount of elements in index buffer)
+    par_shapes_compute_normals(par);
 
-	float tcoords[] = {
-		0.0f, 0.0f,
-		1.0f, 0.0f,
-		1.0f, 1.0f,
-		0.0f, 1.0f,
-		1.0f, 0.0f,
-		1.0f, 1.0f,
-		0.0f, 1.0f,
-		0.0f, 0.0f,
-		0.0f, 1.0f,
-		0.0f, 0.0f,
-		1.0f, 0.0f,
-		1.0f, 1.0f,
-		1.0f, 1.0f,
-		0.0f, 1.0f,
-		0.0f, 0.0f,
-		1.0f, 0.0f,
-		1.0f, 0.0f,
-		1.0f, 1.0f,
-		0.0f, 1.0f,
-		0.0f, 0.0f,
-		0.0f, 0.0f,
-		1.0f, 0.0f,
-		1.0f, 1.0f,
-		0.0f, 1.0f
-	};
+    mesh->vertex_count = par->ntriangles * 3;
+    mesh->indices.resize(mesh->vertex_count);
+    mesh->positions.resize(par->npoints);
+    mesh->normals.resize(par->npoints);
+    if (par->tcoords != nullptr)
+        mesh->tcoords.resize(par->npoints);
 
-	float normals[] = {
-		0.0f, 0.0f, 1.0f,
-		0.0f, 0.0f, 1.0f,
-		0.0f, 0.0f, 1.0f,
-		0.0f, 0.0f, 1.0f,
-		0.0f, 0.0f,-1.0f,
-		0.0f, 0.0f,-1.0f,
-		0.0f, 0.0f,-1.0f,
-		0.0f, 0.0f,-1.0f,
-		0.0f, 1.0f, 0.0f,
-		0.0f, 1.0f, 0.0f,
-		0.0f, 1.0f, 0.0f,
-		0.0f, 1.0f, 0.0f,
-		0.0f,-1.0f, 0.0f,
-		0.0f,-1.0f, 0.0f,
-		0.0f,-1.0f, 0.0f,
-		0.0f,-1.0f, 0.0f,
-		1.0f, 0.0f, 0.0f,
-		1.0f, 0.0f, 0.0f,
-		1.0f, 0.0f, 0.0f,
-		1.0f, 0.0f, 0.0f,
-		-1.0f, 0.0f, 0.0f,
-		-1.0f, 0.0f, 0.0f,
-		-1.0f, 0.0f, 0.0f,
-		-1.0f, 0.0f, 0.0f
-	};
+    Vector3* par_positions = reinterpret_cast<Vector3*>(par->points);
+    Vector3* par_normals = reinterpret_cast<Vector3*>(par->normals);
+    Vector2* par_tcoords = reinterpret_cast<Vector2*>(par->tcoords);
+    memcpy(mesh->positions.data(), par_positions, par->npoints * sizeof(Vector3));
+    memcpy(mesh->normals.data(), par_normals, par->npoints * sizeof(Vector3));
+    memcpy(mesh->indices.data(), par->triangles, mesh->vertex_count * sizeof(PAR_SHAPES_T));
+    if (par_tcoords != nullptr)
+        memcpy(mesh->tcoords.data(), par_tcoords, par->npoints * sizeof(Vector2));
+}
 
-	mesh->positions.resize(24);
-	mesh->normals.resize(24);
-	mesh->tcoords.resize(24);
-	memcpy(mesh->positions.data(), positions, 24 * sizeof(Vector3));
-	memcpy(mesh->normals.data(), normals, 24 * sizeof(Vector3));
-	memcpy(mesh->tcoords.data(), tcoords, 24 * sizeof(Vector2));
+void LoadMeshPlaneOptimal(Mesh* mesh)
+{
+    mesh->vertex_count = 6;
 
-	int k = 0;
-	mesh->indices.resize(36);
-	for (int i = 0; i < 36; i += 6)
-	{
-		mesh->indices[i] = 4 * k;
-		mesh->indices[i + 1] = 4 * k + 1;
-		mesh->indices[i + 2] = 4 * k + 2;
-		mesh->indices[i + 3] = 4 * k;
-		mesh->indices[i + 4] = 4 * k + 2;
-		mesh->indices[i + 5] = 4 * k + 3;
+    mesh->positions.resize(4);
+    mesh->tcoords.resize(4);
+    mesh->normals.resize(4);
+    mesh->indices.resize(6);
 
-		k++;
-	}
+    mesh->positions[0] = { -0.5f, -0.5f, 0.0f };
+    mesh->positions[1] = { 0.5f, -0.5f, 0.0f };
+    mesh->positions[2] = { 0.5f,  0.5f, 0.0f };
+    mesh->positions[3] = { -0.5f, 0.5f, 0.0f };
 
-	mesh->count = 36;
+    mesh->tcoords[0] = { 0.0f, 0.0f };
+    mesh->tcoords[1] = { 1.0f, 0.0f };
+    mesh->tcoords[2] = { 1.0f, 1.0f };
+    mesh->tcoords[3] = { 0.0f, 1.0f };
+
+    mesh->normals[0] = Vector3UnitZ;
+    mesh->normals[1] = Vector3UnitZ;
+    mesh->normals[2] = Vector3UnitZ;
+    mesh->normals[3] = Vector3UnitZ;
+
+    mesh->indices[0] = 0;
+    mesh->indices[1] = 1;
+    mesh->indices[2] = 2;
+    mesh->indices[3] = 0;
+    mesh->indices[4] = 2;
+    mesh->indices[5] = 3;
+}
+
+void LoadMeshPlaneUnoptimal(Mesh* mesh)
+{
+    mesh->vertex_count = 6;
+
+    std::vector<Vector3> positions;
+    std::vector<Vector2> tcoords;
+    std::vector<Vector3> normals;
+    std::vector<uint16_t> indices;
+
+    positions.resize(4);
+    tcoords.resize(4);
+    normals.resize(4);
+    indices.resize(6);
+    
+    positions[0] = { -0.5f, -0.5f, 0.0f };
+    positions[1] = {  0.5f, -0.5f, 0.0f };
+    positions[2] = {  0.5f,  0.5f, 0.0f };
+    positions[3] = { -0.5f,  0.5f, 0.0f };
+
+    tcoords[0] = { 0.0f, 0.0f };
+    tcoords[1] = { 1.0f, 0.0f };
+    tcoords[2] = { 1.0f, 1.0f };
+    tcoords[3] = { 0.0f, 1.0f };
+
+    normals[0] = Vector3UnitZ;
+    normals[1] = Vector3UnitZ;
+    normals[2] = Vector3UnitZ;
+    normals[3] = Vector3UnitZ;
+
+    indices[0] = 0;
+    indices[1] = 1;
+    indices[2] = 2;
+    indices[3] = 0;
+    indices[4] = 2;
+    indices[5] = 3;
+
+    mesh->positions.resize(6);
+    mesh->tcoords.resize(6);
+    mesh->normals.resize(6);
+    for (size_t i = 0; i < indices.size(); i++)
+    {
+        uint16_t index = indices[i];
+        Vector3 v = positions[index];
+        Vector2 vt = tcoords[index];
+        Vector3 vn = normals[index];
+
+        mesh->positions[i] = v;
+        mesh->tcoords[i] = vt;
+        mesh->normals[i] = vn;
+    }
 }

@@ -3,7 +3,10 @@
 #include "raymath.h"
 
 GLuint CreateShader(GLint type, const char* path);
+void DestroyShader(GLuint* handle);
+
 GLuint CreateProgram(GLuint vs, GLuint fs);
+void DestroyProgram(GLuint* handle);
 
 void BeginShader(GLuint shader);
 void EndShader();

@@ -16,6 +16,9 @@ struct App
 	GLFWwindow* window = nullptr;
     int keys_prev[KEY_COUNT]{};
     int keys_curr[KEY_COUNT]{};
+    float frame_time_begin = 0.0f;
+    float frame_time_end = 0.0f;
+    float frame_time_delta = 0.0f;
 } g_app;
 
 void KeyboardCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
@@ -123,6 +126,10 @@ void CreateWindow(int width, int height, const char* title)
 
     // Initialize graphics pipeline state
     glEnable(GL_DEPTH_TEST); // Enable depth-testing (occlude overlapping objects)
+
+    glEnable(GL_CULL_FACE); // Disabled by default (OpenGL will draw both front faces and back faces)
+    glFrontFace(GL_CCW);    // "Front-facing triangles have counter-clockwize winding order"
+    glCullFace(GL_BACK);    // "Cull back-facing triangles only"
 }
 
 void SetWindowShouldClose(bool close)
@@ -133,6 +140,11 @@ void SetWindowShouldClose(bool close)
 bool WindowShouldClose()
 {
     return glfwWindowShouldClose(g_app.window);
+}
+
+float FrameTime()
+{
+    return g_app.frame_time_delta;
 }
 
 float Time()
@@ -151,6 +163,17 @@ void Loop()
 
     /* Poll for and process events */
     glfwPollEvents();
+}
+
+void BeginFrame()
+{
+    g_app.frame_time_begin = glfwGetTime();
+}
+
+void EndFrame()
+{
+    g_app.frame_time_end = glfwGetTime();
+    g_app.frame_time_delta = g_app.frame_time_end - g_app.frame_time_begin;
 }
 
 void BeginGui()

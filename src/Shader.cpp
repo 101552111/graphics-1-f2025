@@ -65,6 +65,13 @@ GLuint CreateShader(GLint type, const char* path)
     return shader;
 }
 
+void DestroyShader(GLuint* handle)
+{
+    assert(*handle != GL_NONE);
+    glDeleteShader(*handle);
+    *handle = GL_NONE;
+}
+
 GLuint CreateProgram(GLuint vs, GLuint fs)
 {
     GLuint program = glCreateProgram();
@@ -83,6 +90,13 @@ GLuint CreateProgram(GLuint vs, GLuint fs)
     }
 
     return program;
+}
+
+void DestroyProgram(GLuint* handle)
+{
+    assert(*handle != GL_NONE);
+    glDeleteProgram(*handle);
+    *handle = GL_NONE;
 }
 
 void BeginShader(GLuint shader)
