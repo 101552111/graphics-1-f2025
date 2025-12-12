@@ -103,6 +103,28 @@ void EndTexture()
 	f_texture = GL_NONE;
 }
 
+void LoadImageFromFile(Image* image, const char* path)
+{
+	int width, height, channels;
+	unsigned char* data = stbi_load(path, &width, &height, &channels, 4); 
+
+	if (data)
+	{
+		image->width = width;
+		image->height = height;
+		image->channels = 4;
+		image->pixels.resize(width * height);
+
+		memcpy(image->pixels.data(), data, width * height * sizeof(Pixel));
+	}
+	else
+	{
+		printf("Could not load image: %s\n", path);
+	}
+
+	stbi_image_free(data);
+}
+
 // Extra practice:
 // Read all of https://learnopengl.com/Getting-started/Textures
 // Modify this program to interpolate between the warm and cool gradients based on a periodic function

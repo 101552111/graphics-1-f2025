@@ -36,7 +36,9 @@ enum MeshType
     // Obj files
     MESH_HEAD,
 
-    MESH_TYPE_COUNT
+    MESH_TYPE_COUNT,
+    MESH_CT4,
+    MESH_REX,
 };
 
 enum TextureType
@@ -196,7 +198,33 @@ int main()
             DrawMesh(meshes[mesh_index]);
         EndTexture();
         EndShader();
-        // (Replace with A4 draw types within the switch-case below):
+         //(Replace with A4 draw types within the switch-case below):
+
+        switch (draw_index)
+        {
+        case A4_PAR_SHAPES_NORMAL_SHADER:
+            BeginShader(shaders[SHADER_NORMAL_COLOR]);
+            SendMat4(mvp, "u_mvp");
+            DrawMesh(meshes[MESH_SPHERE]);
+            EndShader();
+            break;
+
+        case A4_OBJ_FILE_TCOORDS_SHADER:
+            BeginShader(shaders[SHADER_TCOORD_COLOR]);
+            SendMat4(mvp, "u_mvp");
+            DrawMesh(meshes[MESH_HEAD]);
+            EndShader();
+            break;
+
+        case A4_CT4_TEXTURE_SHADER:
+            break;
+
+        case A4_MANUAL_MESH:
+            break;
+
+        case A4_CUSTOM_DRAW:
+            break;
+        }
 
         BeginGui();
         //ImGui::ShowDemoWindow(nullptr);
